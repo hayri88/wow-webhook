@@ -57,6 +57,10 @@ def add_event(data: EventRequest):
     CLIENT_SECRET = os.getenv("CLIENT_SECRET")
     REFRESH_TOKEN = os.getenv("REFRESH_TOKEN")
 
+    # LOG TEST
+    print("📛 Takvim ID:", CALENDAR_ID)
+    print("🕒 Başlangıç:", dt_start.isoformat())
+
     creds = Credentials(
         token=None,
         refresh_token=REFRESH_TOKEN,
@@ -87,5 +91,9 @@ def add_event(data: EventRequest):
         "end": {"dateTime": dt_end.isoformat(), "timeZone": "Europe/Istanbul"}
     }
 
+    print("📅 Takvime gönderilen etkinlik:", event)
+
     created_event = service.events().insert(calendarId=CALENDAR_ID, body=event).execute()
+    print("📎 Etkinlik bağlantısı:", created_event.get("htmlLink"))
+
     return {"status": "success", "event_id": created_event.get("id")}
