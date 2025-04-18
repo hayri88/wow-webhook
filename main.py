@@ -1,17 +1,20 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from datetime import datetime, timedelta
-import re
 import os
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 
 app = FastAPI()
 
-# Sadece Hollandaca ay adları
-MONTH_MAP = {
-    "januari": "January", "februari": "February", "maart": "March", "april": "April", "mei": "May", "juni": "June",
-    "juli": "July", "augustus": "August", "september": "September", "oktober": "October", "november": "November", "december": "December"
+# Çok basit ay adları listesi (TR ve NL destekli)
+MONTHS_TR_NL = {
+    "ocak": "January", "şubat": "February", "mart": "March", "nisan": "April",
+    "mayıs": "May", "haziran": "June", "temmuz": "July", "ağustos": "August",
+    "eylül": "September", "ekim": "October", "kasım": "November", "aralık": "December",
+    "januari": "January", "februari": "February", "maart": "March", "april": "April",
+    "mei": "May", "juni": "June", "juli": "July", "augustus": "August",
+    "september": "September", "oktober": "October", "november": "November", "december": "December"
 }
 
 class EventRequest(BaseModel):
@@ -21,33 +24,29 @@ class EventRequest(BaseModel):
 def add_event(data: EventRequest):
     msg = data.message.lower()
 
-    # Tarih, saat ve müşteri adını ayıklama
-    date_match = re.search(r"(\d{1,2}) (\w+) (\d{4})", msg)  # örn. 20 april 2025
-    time_match = re.search(r"om (\d{1,2})[:\.]?(\d{2})", msg)  # örn. om 14:30 veya om 1430
-    customer_match = re.search(r"^(.*?) klant", msg)
+    # Tarih: "24 nisan 2025" veya "23 april 2025"
+    date_match = None
+    for month in MONTHS_TR_NL:
+        date_match = re.search(r"(\d{1,2}) " + month + r" (\d{4})", msg)
+        if date_match:
+            month_en = MONTHS_TR_NL[month]
+            break
 
-    if not (date_match and time_match and customer_match):
-        return {"error": "Datum, tijd of klantnaam niet gevonden."}
+    time_match = re.search(r"(saat|om)? ?(\d{1,2})[:\.](\d{2})", msg)
+    name_match = re.search(r"^([a-zçşıöüğâêîûéàëäèïa-z0-9\- ]+?) (müşterisi|müsterisinin|klant|heeft|musterim|klant heeft)", msg)
 
-    # Ay ismini çevir
-    raw_month = date_match.group(2)
-    month = MONTH_MAP.get(raw_month.lower())
-    if not month:
-        return {"error": f"Maand niet herkend: '{raw_month}'"}
+    if not (date_match and time_match and name_match):
+        return {"error": "Tarih, saat veya müşteri adı bulunamadı."}
 
     try:
-        date_str = f"{date_match.group(1)} {month} {date_match.group(3)}"
+        date_str = f"{date_match.group(1)} {month_en} {date_match.group(2)}"
         dt_date = datetime.strptime(date_str, "%d %B %Y")
-    except ValueError:
-        return {"error": f"Datumformaat ongeldig: '{date_str}'"}
-
-    try:
-        hour = int(time_match.group(1))
-        minute = int(time_match.group(2))
+        hour = int(time_match.group(2))
+        minute = int(time_match.group(3))
     except:
-        return {"error": "Tijdformaat ongeldig."}
+        return {"error": "Tarih veya saat formatı geçersiz."}
 
-    customer = customer_match.group(1).strip().capitalize()
+    customer = name_match.group(1).strip().title()
     dt_start = dt_date.replace(hour=hour, minute=minute)
     dt_end = dt_start + timedelta(hours=1)
 
@@ -56,10 +55,6 @@ def add_event(data: EventRequest):
     CLIENT_ID = os.getenv("CLIENT_ID")
     CLIENT_SECRET = os.getenv("CLIENT_SECRET")
     REFRESH_TOKEN = os.getenv("REFRESH_TOKEN")
-
-    # LOG TEST
-    print("📛 Takvim ID:", CALENDAR_ID)
-    print("🕒 Başlangıç:", dt_start.isoformat())
 
     creds = Credentials(
         token=None,
@@ -71,7 +66,7 @@ def add_event(data: EventRequest):
 
     service = build("calendar", "v3", credentials=creds)
 
-    # 🔄 ÇAKIŞMA KONTROLÜ
+    # Çakışma kontrolü
     conflict_check = service.events().list(
         calendarId=CALENDAR_ID,
         timeMin=dt_start.isoformat() + "Z",
@@ -81,19 +76,14 @@ def add_event(data: EventRequest):
     ).execute()
 
     if conflict_check.get("items"):
-        return {"error": f"Er is al een afspraak op {dt_start.strftime('%d %B %Y %H:%M')}"}
+        return {"error": f"{dt_start.strftime('%d %B %Y %H:%M')} saatinde başka bir randevu var."}
 
-    # Randevu oluştur
     event = {
-        "summary": f"{customer} – Afspraak",
-        "description": msg,
+        "summary": f"{customer} – Randevu",
+        "description": data.message,
         "start": {"dateTime": dt_start.isoformat(), "timeZone": "Europe/Istanbul"},
         "end": {"dateTime": dt_end.isoformat(), "timeZone": "Europe/Istanbul"}
     }
 
-    print("📅 Takvime gönderilen etkinlik:", event)
-
     created_event = service.events().insert(calendarId=CALENDAR_ID, body=event).execute()
-    print("📎 Etkinlik bağlantısı:", created_event.get("htmlLink"))
-
     return {"status": "success", "event_id": created_event.get("id")}
