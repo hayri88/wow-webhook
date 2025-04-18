@@ -91,12 +91,24 @@ def add_event(data: EventRequest):
 
 @app.get("/list-events")
 def list_events():
-    creds = Credentials.from_authorized_user_file("token.json", ["https://www.googleapis.com/auth/calendar.readonly"])
+    CALENDAR_ID = os.getenv("CALENDAR_ID")
+    CLIENT_ID = os.getenv("CLIENT_ID")
+    CLIENT_SECRET = os.getenv("CLIENT_SECRET")
+    REFRESH_TOKEN = os.getenv("REFRESH_TOKEN")
+
+    creds = Credentials(
+        token=None,
+        refresh_token=REFRESH_TOKEN,
+        client_id=CLIENT_ID,
+        client_secret=CLIENT_SECRET,
+        token_uri="https://oauth2.googleapis.com/token"
+    )
+
     service = build("calendar", "v3", credentials=creds)
 
     now = datetime.utcnow().isoformat() + "Z"
     events_result = service.events().list(
-        calendarId=os.getenv("CALENDAR_ID"),
+        calendarId=CALENDAR_ID,
         timeMin=now,
         maxResults=10,
         singleEvents=True,
