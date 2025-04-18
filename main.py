@@ -5,6 +5,7 @@ import os
 import re
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
+from dateutil.parser import parse
 
 app = FastAPI()
 
@@ -17,8 +18,6 @@ MONTHS_TR_NL = {
     "mei": "May", "juni": "June", "juli": "July", "augustus": "August",
     "september": "September", "oktober": "October", "november": "November", "december": "December"
 }
-
-MONTHS_TR = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
 
 class EventRequest(BaseModel):
     message: str
@@ -108,11 +107,11 @@ def list_events():
     events = events_result.get("items", [])
     output = []
     for event in events:
-        start_raw = event["start"].get("dateTime", event["start"].get("date"))
+        start = event["start"].get("dateTime", event["start"].get("date"))
         try:
-            dt = datetime.fromisoformat(start_raw.replace("Z", "+00:00"))
-            date_formatted = f"{dt.day} {MONTHS_TR[dt.month - 1]} {dt.year} saat {dt.strftime('%H:%M')}"
+            dt = parse(start)
+            formatted = dt.strftime("%d %B %Y saat %H:%M")
         except:
-            date_formatted = start_raw
-        output.append(f'{event["summary"]} – {date_formatted}')
+            formatted = start
+        output.append(f'{event["summary"]} – {formatted}')
     return {"events": output}
