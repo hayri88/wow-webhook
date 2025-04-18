@@ -1,35 +1,44 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from pydantic import BaseModel
 from datetime import datetime, timedelta
 import re
 import os
-import locale
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 
-# Türkçe tarihleri anlayabilmesi için
-locale.setlocale(locale.LC_TIME, "tr_TR.UTF-8")
-
 app = FastAPI()
 
+# Türkçe ve Hollandaca ay adları
+MONTH_MAP = {
+    "ocak": "January", "şubat": "February", "mart": "March", "nisan": "April", "mayıs": "May", "haziran": "June",
+    "temmuz": "July", "ağustos": "August", "eylül": "September", "ekim": "October", "kasım": "November", "aralık": "December",
+    "januari": "January", "februari": "February", "maart": "March", "april": "April", "mei": "May", "juni": "June",
+    "juli": "July", "augustus": "August", "september": "September", "oktober": "October", "november": "November", "december": "December"
+}
 
 class EventRequest(BaseModel):
     message: str
 
 @app.post("/add-event")
 def add_event(data: EventRequest):
-    msg = data.message
+    msg = data.message.lower()
 
     # Tarih, saat ve müşteri adını ayıklama
     date_match = re.search(r"(\d{1,2}) (\w+) (\d{4})", msg)  # örn. 24 Nisan 2025
-    time_match = re.search(r"saat (\d{1,2})[:\.]?(\d{2})", msg)  # örn. saat 14:30
+    time_match = re.search(r"saat (\d{1,2})[:\.]?(\d{2})", msg)  # örn. saat 14:30 veya 1430
     customer_match = re.search(r"^(.*?) (müşterisinin|ile)", msg)
 
     if not (date_match and time_match and customer_match):
         return {"error": "Tarih, saat veya müşteri adı bulunamadı."}
 
+    # Ay ismini çevir
+    raw_month = date_match.group(2)
+    month = MONTH_MAP.get(raw_month.lower())
+    if not month:
+        return {"error": f"Ay ismi tanınamadı: '{raw_month}'"}
+
     try:
-        date_str = f"{date_match.group(1)} {date_match.group(2)} {date_match.group(3)}"
+        date_str = f"{date_match.group(1)} {month} {date_match.group(3)}"
         dt_date = datetime.strptime(date_str, "%d %B %Y")
     except ValueError:
         return {"error": f"Tarih formatı anlaşılamadı: '{date_str}'"}
@@ -40,7 +49,7 @@ def add_event(data: EventRequest):
     except:
         return {"error": "Saat formatı anlaşılamadı."}
 
-    customer = customer_match.group(1).strip()
+    customer = customer_match.group(1).strip().capitalize()
     dt_start = dt_date.replace(hour=hour, minute=minute)
     dt_end = dt_start + timedelta(hours=1)
 
@@ -82,9 +91,3 @@ def add_event(data: EventRequest):
 
     created_event = service.events().insert(calendarId=CALENDAR_ID, body=event).execute()
     return {"status": "success", "event_id": created_event.get("id")}
-
-# Sunucuyu Render'da çalıştırmak için
-if __name__ == "__main__":
-    import uvicorn
-    port = int(os.environ.get("PORT", 8000))
-    uvicorn.run("main:app", host="0.0.0.0", port=port)
