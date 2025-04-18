@@ -17,7 +17,7 @@ def add_event(data: EventRequest):
 
     # Tarih, saat ve müşteri adını ayıklama
     date_match = re.search(r"(\d{1,2}) (\w+) (\d{4})", msg)  # örn. 24 Nisan 2025
-    time_match = re.search(r"saat (\d{1,2})[:\.](\d{2})", msg)  # örn. saat 14:30
+    time_match = re.search(r"saat (\d{1,2})[:\.]?(\d{2})", msg)  # örn. saat 14:30
     customer_match = re.search(r"^(.*?) (müşterisinin|ile)", msg)
 
     if not (date_match and time_match and customer_match):
@@ -77,3 +77,9 @@ def add_event(data: EventRequest):
 
     created_event = service.events().insert(calendarId=CALENDAR_ID, body=event).execute()
     return {"status": "success", "event_id": created_event.get("id")}
+
+# Sunucuyu Render'da çalıştırmak için
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
