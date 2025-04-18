@@ -91,24 +91,12 @@ def add_event(data: EventRequest):
 
 @app.get("/list-events")
 def list_events():
-    CALENDAR_ID = os.getenv("CALENDAR_ID")
-    CLIENT_ID = os.getenv("CLIENT_ID")
-    CLIENT_SECRET = os.getenv("CLIENT_SECRET")
-    REFRESH_TOKEN = os.getenv("REFRESH_TOKEN")
-
-    creds = Credentials(
-        token=None,
-        refresh_token=REFRESH_TOKEN,
-        client_id=CLIENT_ID,
-        client_secret=CLIENT_SECRET,
-        token_uri="https://oauth2.googleapis.com/token"
-    )
-
+    creds = Credentials.from_authorized_user_file("token.json", ["https://www.googleapis.com/auth/calendar.readonly"])
     service = build("calendar", "v3", credentials=creds)
 
     now = datetime.utcnow().isoformat() + "Z"
     events_result = service.events().list(
-        calendarId=CALENDAR_ID,
+        calendarId=os.getenv("CALENDAR_ID"),
         timeMin=now,
         maxResults=10,
         singleEvents=True,
@@ -119,5 +107,7 @@ def list_events():
     output = []
     for event in events:
         start = event["start"].get("dateTime", event["start"].get("date"))
-        output.append(f'{event["summary"]} – {start}')
+        dt = datetime.fromisoformat(start.replace("Z", "+00:00"))
+        formatted_date = dt.strftime("%d %B %Y saat %H:%M")
+        output.append(f'{event["summary"]} – {formatted_date}')
     return {"events": output}
