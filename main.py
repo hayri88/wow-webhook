@@ -6,7 +6,6 @@ import re  # <== BU SATIRI EKLE
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 
-
 app = FastAPI()
 
 # Çok basit ay adları listesi (TR ve NL destekli)
@@ -22,6 +21,10 @@ MONTHS_TR_NL = {
 class EventRequest(BaseModel):
     message: str
 
+@app.get("/")
+def root():
+    return {"status": "alive"}
+
 @app.post("/add-event")
 def add_event(data: EventRequest):
     msg = data.message.lower()
@@ -34,7 +37,7 @@ def add_event(data: EventRequest):
             month_en = MONTHS_TR_NL[month]
             break
 
-    time_match = re.search(r"(saat|om)? ?(\d{1,2})[:\.](\d{2})", msg)
+    time_match = re.search(r"(saat|om)? ?(\d{1,2})[:\.]?(\d{2})", msg)
     name_match = re.search(r"^([a-zçşıöüğâêîûéàëäèïa-z0-9\- ]+?) (müşterisi|müsterisinin|klant|heeft|musterim|klant heeft)", msg)
 
     if not (date_match and time_match and name_match):
