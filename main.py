@@ -2,8 +2,10 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from datetime import datetime, timedelta
 import os
+import re  # <== BU SATIRI EKLE
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
+
 
 app = FastAPI()
 
