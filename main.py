@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from datetime import datetime, timedelta
 import os
-import re  # <== BU SATIRI EKLE
+import re
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 
@@ -20,10 +20,6 @@ MONTHS_TR_NL = {
 
 class EventRequest(BaseModel):
     message: str
-
-@app.get("/")
-def root():
-    return {"status": "alive"}
 
 @app.post("/add-event")
 def add_event(data: EventRequest):
@@ -92,3 +88,24 @@ def add_event(data: EventRequest):
 
     created_event = service.events().insert(calendarId=CALENDAR_ID, body=event).execute()
     return {"status": "success", "event_id": created_event.get("id")}
+
+@app.get("/list-events")
+def list_events():
+    creds = Credentials.from_authorized_user_file("token.json", ["https://www.googleapis.com/auth/calendar.readonly"])
+    service = build("calendar", "v3", credentials=creds)
+
+    now = datetime.utcnow().isoformat() + "Z"
+    events_result = service.events().list(
+        calendarId=os.getenv("CALENDAR_ID"),
+        timeMin=now,
+        maxResults=10,
+        singleEvents=True,
+        orderBy="startTime"
+    ).execute()
+
+    events = events_result.get("items", [])
+    output = []
+    for event in events:
+        start = event["start"].get("dateTime", event["start"].get("date"))
+        output.append(f'{event["summary"]} – {start}')
+    return {"events": output}
