@@ -3,10 +3,15 @@ from pydantic import BaseModel
 from datetime import datetime, timedelta
 import re
 import os
+import locale
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 
+# Türkçe tarihleri anlayabilmesi için
+locale.setlocale(locale.LC_TIME, "tr_TR.UTF-8")
+
 app = FastAPI()
+
 
 class EventRequest(BaseModel):
     message: str
