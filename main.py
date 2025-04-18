@@ -18,6 +18,8 @@ MONTHS_TR_NL = {
     "september": "September", "oktober": "October", "november": "November", "december": "December"
 }
 
+MONTHS_TR = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
+
 class EventRequest(BaseModel):
     message: str
 
@@ -106,8 +108,11 @@ def list_events():
     events = events_result.get("items", [])
     output = []
     for event in events:
-        start = event["start"].get("dateTime", event["start"].get("date"))
-        dt = datetime.fromisoformat(start.replace("Z", "+00:00"))
-        formatted_date = dt.strftime("%d %B %Y saat %H:%M")
-        output.append(f'{event["summary"]} – {formatted_date}')
+        start_raw = event["start"].get("dateTime", event["start"].get("date"))
+        try:
+            dt = datetime.fromisoformat(start_raw.replace("Z", "+00:00"))
+            date_formatted = f"{dt.day} {MONTHS_TR[dt.month - 1]} {dt.year} saat {dt.strftime('%H:%M')}"
+        except:
+            date_formatted = start_raw
+        output.append(f'{event["summary"]} – {date_formatted}')
     return {"events": output}
